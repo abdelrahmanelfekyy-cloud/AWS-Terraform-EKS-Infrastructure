@@ -1,0 +1,95 @@
+
+resource "aws_iam_role" "cluster" {
+  name = "${var.environment}-eks-cluster-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "eks.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "cluster_AmazonEKSClusterPolicy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+  role       = aws_iam_role.cluster.name
+}
+
+resource "aws_iam_role" "nodes" {
+  name = "${var.environment}-eks-nodes-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "ec2.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "nodes_AmazonEKSWorkerNodePolicy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+  role       = aws_iam_role.nodes.name
+}
+
+resource "aws_iam_role_policy_attachment" "nodes_AmazonEKS_CNI_Policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+  role       = aws_iam_role.nodes.name
+}
+
+resource "aws_iam_role_policy_attachment" "nodes_AmazonEC2ContainerRegistryReadOnly" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  role       = aws_iam_role.nodes.name
+}
+
+
+resource "aws_eks_cluster" "eks_cluster" {
+  name     = "${var.environment}-eks-cluster"
+  role_arn = aws_iam_role.cluster.arn
+  version  = "1.30"
+
+  vpc_config {
+    subnet_ids              = var.private_subnet_ids 
+    security_group_ids      = [var.cluster_sg_id]
+    endpoint_private_access = true                  
+    endpoint_public_access  = true                   
+  }
+
+  depends_on = [aws_iam_role_policy_attachment.cluster_AmazonEKSClusterPolicy]
+}
+
+
+resource "aws_eks_node_group" "aws_eks_node_group" {
+  cluster_name    = aws_eks_cluster.eks_cluster.name
+  node_group_name = "${var.environment}-managed-node-group"
+  node_role_arn   = aws_iam_role.nodes.arn
+  subnet_ids      = var.private_subnet_ids 
+
+  ami_type       = "AL2_x86_64" 
+  instance_types = ["t3.medium"]
+
+  
+  scaling_config {
+    desired_size = 2 
+    max_size     = 3  
+    min_size     = 1 
+  }
+
+  update_config {
+    max_unavailable = 1 
+  }
+
+  remote_access {
+    ec2_ssh_key               = var.key_name  
+    source_security_group_ids = [var.nodes_sg_id] 
+  }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.nodes_AmazonEKSWorkerNodePolicy,
+    aws_iam_role_policy_attachment.nodes_AmazonEKS_CNI_Policy,
+    aws_iam_role_policy_attachment.nodes_AmazonEC2ContainerRegistryReadOnly,
+  ]
+}

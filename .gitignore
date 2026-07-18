@@ -1,0 +1,27 @@
+# Local .terraform folder (حجمه كبير وبيتحمل أوتوماتيك مع terraform init)
+.terraform/
+
+# .tfstate files (الملفات دي فيها الـ State الحالية وممكن تحتوي على باسووردات وأسرار)
+*.tfstate
+*.tfstate.*
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Exclude all .tfvars files (الملفات اللي بتخزن فيها قيم المتغيرات الحقيقية والـ Credentials)
+*.tfvars
+*.tfvars.json
+
+# Override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Include override.tf if you do wish to change this behavior
+# !override.tf
+
+# CLI configuration files
+.terraformrc
+terraform.rc
